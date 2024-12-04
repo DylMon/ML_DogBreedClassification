@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dog Breed Classifier</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Dog Breed Classifier</h1>
+    <p>Upload an image of a dog, and the model will predict its breed!</p>
+
+    <!-- File input -->
+    <input type="file" id="fileInput" accept="image/*">
+
+    <!-- Preview the uploaded image -->
+    <img id="imagePreview" src="" alt="Your uploaded image will appear here.">
+
+    <!-- Results -->
+    <p id="predictionResult">Prediction will appear here.</p>
+
+    <!-- Load TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <!-- Load custom JavaScript -->
+    <script src="app.js"></script>
+</body>
+</html>

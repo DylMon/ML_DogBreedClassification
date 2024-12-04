@@ -1,0 +1,27 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin: 20px;
+}
+
+h1 {
+    color: #333;
+}
+
+#fileInput {
+    margin: 20px;
+}
+
+#imagePreview {
+    display: block;
+    max-width: 300px;
+    margin: 20px auto;
+    border: 1px solid #ddd;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+#predictionResult {
+    font-size: 18px;
+    font-weight: bold;
+    color: #007BFF;
+}
