@@ -156,7 +156,7 @@ if __name__ == "__main__":
     print("Model saved as dog_breed_classifier.h5")
 
     # Save the model in TensorFlow.js format for the webpage
-    tfjs_output_dir = "tfjs_model"
+    tfjs_output_dir = "public/tfjs_model"
     tfjs.converters.save_keras_model(model, tfjs_output_dir)
     print(f"Model saved in TensorFlow.js format at: {tfjs_output_dir}")
 
