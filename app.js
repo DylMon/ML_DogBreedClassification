@@ -1,12 +1,27 @@
-// Define the model URL (update this with your model's path)
-const MODEL_URL = './model/model.json';
+// Define the model URL and breed list paths
+const MODEL_URL = './tfjs_model/model.json';
+const BREEDS_URL = './breeds.json';
+
+// Initialize variables
+let model;
+let breeds = [];
+
+// Load the list of breeds
+fetch(BREEDS_URL)
+    .then(response => response.json())
+    .then(data => { breeds = data; })
+    .catch(error => console.error("Error loading breed names:", error));
 
 // Load the model
-let model;
 async function loadModel() {
-    document.getElementById("predictionResult").textContent = "Loading model...";
-    model = await tf.loadLayersModel(MODEL_URL);
-    document.getElementById("predictionResult").textContent = "Model loaded. Ready for predictions!";
+    try {
+        document.getElementById("predictionResult").textContent = "Loading model...";
+        model = await tf.loadLayersModel(MODEL_URL);
+        document.getElementById("predictionResult").textContent = "Model loaded. Ready for predictions!";
+    } catch (error) {
+        document.getElementById("predictionResult").textContent = "Error loading model!";
+        console.error(error);
+    }
 }
 loadModel();
 
@@ -25,27 +40,35 @@ document.getElementById("fileInput").addEventListener("change", async (event) =>
 
 // Predict the breed
 async function predict(imageElement) {
-    if (!model) {
-        alert("Model not loaded yet!");
+    if (!model || breeds.length === 0) {
+        alert("Model or breeds list not loaded yet!");
         return;
     }
 
-    // Preprocess the image
-    const tensor = tf.browser.fromPixels(imageElement) // Load image as tensor
-        .resizeBilinear([224, 224]) // Resize to model's input size
-        .div(255.0) // Normalize to [0, 1]
-        .expandDims(0); // Add batch dimension
+    try {
+        // Preprocess the image
+        const tensor = tf.browser.fromPixels(imageElement)
+            .resizeBilinear([224, 224]) // Resize to model's input size
+            .div(255.0) // Normalize to [0, 1]
+            .expandDims(0); // Add batch dimension
 
-    // Make a prediction
-    const predictions = model.predict(tensor).dataSync(); // Get prediction scores
-    const predictedIndex = tf.argMax(predictions).dataSync()[0]; // Get index of highest score
-    const confidence = (predictions[predictedIndex] * 100).toFixed(2); // Confidence score
+        // Make predictions
+        const predictions = model.predict(tensor).dataSync();
+        const topK = 3; // Number of top predictions to show
+        const sortedIndices = Array.from(predictions)
+            .map((p, i) => [p, i]) // Pair scores with indices
+            .sort((a, b) => b[0] - a[0]) // Sort by scores descending
+            .slice(0, topK); // Get top K predictions
 
-    // List of breeds (replace with your dataset's breed names)
-    const breeds = ["Breed 1", "Breed 2", "Breed 3"]; // Update with actual breed names
+        // Display the top predictions
+        let resultText = "Top predictions:\n";
+        sortedIndices.forEach(([score, index]) => {
+            resultText += `${breeds[index]}: ${(score * 100).toFixed(2)}%\n`;
+        });
+        document.getElementById("predictionResult").textContent = resultText;
 
-    // Show the result
-    const predictedBreed = breeds[predictedIndex];
-    document.getElementById("predictionResult").textContent =
-        `Prediction: ${predictedBreed} (Confidence: ${confidence}%)`;
+    } catch (error) {
+        console.error("Error during prediction:", error);
+        document.getElementById("predictionResult").textContent = "Error during prediction.";
+    }
 }

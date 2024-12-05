@@ -3,7 +3,7 @@ import shutil
 from sklearn.model_selection import train_test_split
 
 # Paths for the original dataset and output folders
-BASE_DIR = "images/images"
+BASE_DIR = "images"
 TRAIN_DIR = "train"
 TEST_DIR = "test"
 
@@ -60,4 +60,3 @@ def split_dataset():
 if __name__ == "__main__":
     split_dataset()
     print("Dataset splitting complete!")
-

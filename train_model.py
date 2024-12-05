@@ -1,6 +1,7 @@
 import os
 import tensorflow as tf
 from tensorflow.keras import layers, models
+import tensorflowjs as tfjs  # Import TensorFlow.js converter
 import matplotlib.pyplot as plt
 
 # Paths to the train and test datasets
@@ -11,9 +12,18 @@ TEST_DIR = "test"
 IMAGE_SIZE = (224, 224)  # Image dimensions for resizing
 BATCH_SIZE = 32
 EPOCHS = 20
+INITIAL_EPOCHS = 10  # Epochs before fine-tuning
+FINE_TUNE_EPOCHS = 10  # Additional epochs for fine-tuning
 
 def load_datasets():
-    """Load the training and testing datasets."""
+    """Load the training and testing datasets with data augmentation."""
+    # Data augmentation
+    data_augmentation = tf.keras.Sequential([
+        layers.RandomFlip("horizontal"),
+        layers.RandomRotation(0.1),
+        layers.RandomZoom(0.1),
+    ])
+
     # Load training dataset
     train_ds = tf.keras.preprocessing.image_dataset_from_directory(
         TRAIN_DIR,
@@ -28,8 +38,11 @@ def load_datasets():
         batch_size=BATCH_SIZE
     )
 
-    # Capture class names from the original datasets
+    # Capture class names BEFORE data augmentation
     class_names = train_ds.class_names
+
+    # Apply data augmentation
+    train_ds = train_ds.map(lambda x, y: (data_augmentation(x), y))
 
     # Optimize performance by adding prefetch
     train_ds = train_ds.prefetch(buffer_size=tf.data.AUTOTUNE)
@@ -38,27 +51,39 @@ def load_datasets():
     return train_ds, test_ds, class_names
 
 
+
 def create_model(num_classes):
-    """Define the CNN model."""
+    """Define the model with transfer learning."""
+    base_model = tf.keras.applications.MobileNetV2(
+        input_shape=(IMAGE_SIZE[0], IMAGE_SIZE[1], 3),
+        include_top=False,  # Exclude the final classification layer
+        weights='imagenet'  # Use pretrained weights
+    )
+    base_model.trainable = False  # Freeze the base model layers
+
+    # Add classification head
     model = models.Sequential([
-        # Input layer (resized images)
-        layers.Rescaling(1./255, input_shape=(IMAGE_SIZE[0], IMAGE_SIZE[1], 3)),  # Normalize pixel values
-
-        # Convolutional layers
-        layers.Conv2D(32, (3, 3), activation='relu'),
-        layers.MaxPooling2D((2, 2)),
-        layers.Conv2D(64, (3, 3), activation='relu'),
-        layers.MaxPooling2D((2, 2)),
-        layers.Conv2D(128, (3, 3), activation='relu'),
-        layers.MaxPooling2D((2, 2)),
-
-        # Flatten and fully connected layers
-        layers.Flatten(),
+        base_model,
+        layers.GlobalAveragePooling2D(),
         layers.Dense(128, activation='relu'),
-        layers.Dropout(0.5),  # Add dropout for regularization
+        layers.Dropout(0.5),
         layers.Dense(num_classes, activation='softmax')  # Output layer
     ])
     return model
+
+
+def fine_tune_model(model, base_model):
+    """Unfreeze some layers of the base model for fine-tuning."""
+    base_model.trainable = True
+    # Fine-tune from the last 30 layers of the base model
+    for layer in base_model.layers[:-30]:
+        layer.trainable = False
+
+    # Recompile with a lower learning rate for fine-tuning
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
+                  loss='sparse_categorical_crossentropy',
+                  metrics=['accuracy'])
+
 
 def plot_metrics(history):
     """Plot training metrics: Loss and Accuracy."""
@@ -87,6 +112,7 @@ def plot_metrics(history):
 
     plt.show()
 
+
 if __name__ == "__main__":
     # Load datasets
     train_ds, test_ds, class_names = load_datasets()
@@ -101,17 +127,38 @@ if __name__ == "__main__":
                   loss='sparse_categorical_crossentropy',
                   metrics=['accuracy'])
 
-    # Train the model
+    # Train the model (initial training phase)
+    print("Starting initial training...")
     history = model.fit(
         train_ds,
         validation_data=test_ds,
-        epochs=EPOCHS
+        epochs=INITIAL_EPOCHS
     )
 
-    # Save the trained model
+    # Fine-tune the model
+    print("Fine-tuning the model...")
+    fine_tune_model(model, model.layers[0])  # Pass the base model
+    fine_tune_history = model.fit(
+        train_ds,
+        validation_data=test_ds,
+        epochs=FINE_TUNE_EPOCHS,
+        initial_epoch=INITIAL_EPOCHS
+    )
+
+    # Combine histories for plotting
+    history.history['accuracy'].extend(fine_tune_history.history['accuracy'])
+    history.history['val_accuracy'].extend(fine_tune_history.history['val_accuracy'])
+    history.history['loss'].extend(fine_tune_history.history['loss'])
+    history.history['val_loss'].extend(fine_tune_history.history['val_loss'])
+
+    # Save the trained model in HDF5 format (optional backup)
     model.save("dog_breed_classifier.h5")
     print("Model saved as dog_breed_classifier.h5")
 
+    # Save the model in TensorFlow.js format for the webpage
+    tfjs_output_dir = "tfjs_model"
+    tfjs.converters.save_keras_model(model, tfjs_output_dir)
+    print(f"Model saved in TensorFlow.js format at: {tfjs_output_dir}")
+
     # Plot metrics
     plot_metrics(history)
-
